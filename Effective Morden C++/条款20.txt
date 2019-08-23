@@ -1,0 +1,37 @@
+对于类似std::shared_ptr但有可能悬空的指针使用std::weak_ptr
+
+
+weak_ptr像shared_ptr那样运作但是他没有引用计数，这样的话，weak_ptr就可能会悬空，因为其所指向的对象可能已经被析构了
+
+weak_ptr不是一种单独的智能指针，而是对shraed_ptr的扩充，weak_ptr一般都是通过shared_ptr来创建的
+当你用shared_ptr初始化一个weak_ptr的时候，并不会更改shared_ptr的引用计数
+
+weak_ptr的悬空也被称作失效(expired)
+
+weak_ptr并没有提供解引用操作，由于我们不知道weak_ptr所指向的对象是否还存在，所以在访问被指向的对象前要先判断weak_ptr是否失效
+如果没有失效才能尝试访问其所指向的对象，但是这样做会造成线程不安全，
+如果在检查了weak_ptr没有失效之后，另一个线程析构了weak_ptr所指向的对象，那么原本线程对其访问就会是一个未定义行为
+所以我们需要一个原子操作来检查weak_ptr是否失效以及在未失效的情况下访问所指向的对象
+这样一来在检查是否失效和访问对象之间不会由于线程切换而造成危险
+可以通过使用weak_ptr来创建shared_ptr来防止这种情况，因为shared_ptr访问其所指的对象总是安全的
+
+有两种使用weak_ptr构造shared_ptr的办法
+一种是通过weak_ptr的lock()函数来给shared_ptr赋值，lock()在weak_ptr失效时返回nullptr，在没有失效时返回所指的值
+auto spw = wpw.lock();
+另一种是将weak_ptr直接作为shared_ptr构造函数的实参，如果weak_ptr失效的话则会抛出异常
+shared_ptr<T> swp(wpw);
+
+只有将对象生存期托管给shared_ptr时，weak_ptr才能检测悬空
+
+weak_ptr常见的应用场景有工厂函数和观察者设计模式
+
+注意：在shared_ptr产生环路的时候，即A通过shared_ptr指向B，B也同样通过shared_ptr指向A，这样会造成资源泄露
+因为引用计数会一直保持为1，阻止A和B被析构
+
+weak_ptr和shared_ptr对象尺寸相同，并使用同样的控制块，并且在操作中也会包含对引用计数的操作
+控制块中有第二个引用计数，weak_ptr操作的就是这个
+
+总结：
+    weak_ptr和shared_ptr类似，可以用在shared_ptr不适合的场景中，例如那些对象指针可以悬空的场景
+    weak_ptr和shared_ptr共享控制块，而且weak_ptr也会操作引用计数，但是不干涉对象的共享所有权
+    weak_ptr操作的引用计数和shared_ptr不是同一个
