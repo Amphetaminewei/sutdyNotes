@@ -1,4 +1,4 @@
-理解 std::move 和 std::forword
+条款23：理解 std::move 和 std::forword
 
 
 简单来说吧， move 不进行任何移动， forword 也不进行任何转发

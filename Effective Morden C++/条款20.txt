@@ -1,4 +1,4 @@
-对于类似std::shared_ptr但有可能悬空的指针使用std::weak_ptr
+条款20；对于类似std::shared_ptr但有可能悬空的指针使用std::weak_ptr
 
 
 weak_ptr像shared_ptr那样运作但是他没有引用计数，这样的话，weak_ptr就可能会悬空，因为其所指向的对象可能已经被析构了

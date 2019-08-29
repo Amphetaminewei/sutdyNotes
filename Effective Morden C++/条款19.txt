@@ -1,4 +1,4 @@
-使用std::shared_ptr管理具备共享所有权的资源
+条款19：使用std::shared_ptr管理具备共享所有权的资源
 
 
 类似unique_ptr，shared_ptr也是智能指针，不同点在于shared_ptr可以共享对象

@@ -1,4 +1,4 @@
-优先使用std::make_unique和std::make_shared，而非直接使用new
+条款21：优先使用std::make_unique和std::make_shared，而非直接使用new
 
 在最简单的make_unique实现中，只需要将形参向构造函数做一次完美转发
 他的工作也正是如此，make系列函数的主要任务就是将参数完美转发给构造函数并返回一个指向该对象的智能指针
