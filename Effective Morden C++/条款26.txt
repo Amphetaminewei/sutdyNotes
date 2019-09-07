@@ -1,0 +1,30 @@
+条款26：避免依万能引用类型进行重载
+
+
+还是来看一个函数：
+    std::multiset<std::string> names;
+    void logAndAdd(const std::string& name){
+        ...
+        names.emplace(name);
+    }
+这种形式相当常见，但是呢，效率低下，来看两种情况：
+    logAndAdd(std::string("fxxk"));
+    logAndAdd("shxt");
+第一种情况传入了一个右值，还是前面说过的原因，因为name作为形参一直是左值，所以name还是通过复制构造的
+实际上一次移动就够了
+第二种情况，由于实参还是一个右值，一个字符串常量，所以实际连一次移动都不需要，
+emplace完全可以利用这个字符串常量直接在 multiset 内部创建一个 string 对象
+
+看，还是右值的问题，前面说了，这种情况万能指针加上 forword 完美解决，反正我读到这是这么想的
+然而标题说了事情肯定没有这么简单蒽
+
+如果你为 logAndAdd 提供了一个重载呢，比如你加上了一个
+void logAndAdd(int index);
+正常调用时你会觉得很开心，问题解决了，但是如果你传入的参数不是 int 而是 shrot 呢
+我们修改后的函数 
+template<class T> logAndAdd(T&& name);
+其中T会被推导成short，然后成为精确匹配，而 int 则只能在类型提升后才能匹配为 shrot ，所以自然你使用 shrot 调用的会是万能引用的版本
+这绝对不是你想看到的蒽
+只要类型不是 int 都极大可能（因为我不敢说全部蒽）被匹配成万能引用
+
+而且由于万能引用的存在，如果你试图去使用一个完美转发的构造函数，重载决议依然会导致你在调用构造函数时错误的调用完美转发构造函数
