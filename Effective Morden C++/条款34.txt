@@ -1,0 +1,40 @@
+条款34：优先使用 lambda 式，而非 std::bind
+
+
+在C++11中，相对于 std::bind 而言， lambda 几乎总是更好的选择，而在C++14中，简直是不二之选
+而优点最主要体现在更好的可读性上
+
+在例子中， lambda 表达式实现了一个简单的转发（在我看来这是个转发
+    auto setSoundL = [](Sound s){
+        using namespace std::chrono;
+        setAlarm(steady_clock::now() + hours(1), s, seconds(30));
+    }
+其中设置了警报在一小时后触发且持续时间为30秒，而警报声音通过 lambda 的参数转发给 setAlarm
+确实看上去很直观，反正我能看懂蒽
+
+再来看如果使用 std::bind 是什么样的：
+    auto setSoundB = std::bind(setAlarm,
+                                steady_clock::now() + hours(1),
+                                _1,
+                                seconds(30));
+出现了个很神奇的 _1 看的人头皮发麻不是嘛
+更何况这样还并不正确，因为 steady_clock::now() 返回的是当前时间，而这里表达式评估求值发生在 std::bind 的实参中
+也就是 steady_clock::now() 所返回的是 bind 调用时刻的时间而不是 setAlarm() 调用的时刻
+想要完善就需要将表达式评估时间延迟到 setAlarm 调用的时候，方法是在 bind 中再嵌套一个 bind
+    auto setSoundB = std::bind(setAlarm,
+                                std::bind(std::plus<>, steady_clock::now(), 1h),
+                                _1,
+                                30s);
+神奇伐，这个 plus 的<>中竟然莫得类型，这是C++14提供的新特性，标准运算符模板的模板类型实参大多数情况下可以省略不写，当然仅限C++14
+
+好像解决了对伐，好像除了难懂且字多外没啥区别了对伐，但是呢，如果你试图重载 setAlarm 就会导致错误，因为在 bind 中只得到了一个函数对象，并没有指明参数
+所以如果 setAlarm 被重载， bind 将不知道该选择哪个好
+而 lambda 由于使用了完整的函数，不会出现这种问题，
+简单还好用，有什么理由不用呢
+
+如果坚持还要用 std::bind 的实现的话，你需要将作为形参的 setAlarm 强制转换为需要的函数指针类型
+但是这样还有一个问题是，在 lambda 中的函数是常规调用，编译器可能会帮你进行内联，而 bind 中使用的则是函数指针，编译器不太可能会将使用函数指针调用的函数内联
+所以可能使用 lambda 会比 bind 更快
+现在是简单好用甚至还可能更快了，更莫得理由不用了对伐，而且如果你要做的事情更复杂， lambda 的优势就会更大
+
+在C++11中，只有两个 lambda 受限的场合有着使用 bind 的理由：移动捕获和堕胎函数对象
