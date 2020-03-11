@@ -1,0 +1,40 @@
+条款36：如果异步是必要的，则指定 std::launch::async
+
+
+仅仅通过std::async运行不一定能达成异步运行的结果，你的要求仅仅是让该函数以符合 std::async 的启动策略来运行
+但这个策略，有两个，都通过限定作用域的枚举类型 std::launch 的枚举量来表示的，分别为 std::launch::async 和 std::launch::deferred
+std::launch::async 启动策略意味着函数 f 必须以异步方式运行，亦即，在另一线程上执行（这才是我们想要的）
+std::launch::deferred 启动策略意味着函数 f 只会在 std::async 所返回的期值的 get 或 wait 得到调用时才运行。亦即，执行会推迟至启动一个调用发生的时刻
+当调用了 get 或 wait 时，f 会同步运行，如果 wait 和 get 都没有得到调用的话，f 是不会执行的（这是不是一种缓释处理？）
+而 std::async 的默认启动策略，如果你不积极指定一个的话，它采用的是对二者进行或运算的结果，也就是这样：
+auto fut = std::async(std::launch::async |
+                      std::launch::deferred,
+                      f);
+也就意味着默认启动方式可以以异步或者同步运行，这也是 std::async 有上一个条款中优势的原因之一
+
+但是这种可能就导致了运行是不可预知的，无法预知 f 是否会并发运行，无法预知 f 是否运行在调用 fut 的 wait 或 get 的线程不同的线程上，甚至不可预知 f 是否会运行
+默认启动策略在调度上的弹性常会在使用 thread_local 变量时刀智不明不白的混淆，因为这意味着如果 f 读或写词线程级局部储存时，无法预知会取得的是哪个线程的局部存储
+
+同时它也会影响那些基于 wait 的循环中以超时为条件者，因为为任务调用 wait_for 或者 wait_until 会产生 std::launch::deferred 一值，
+如果默认启动策略选择了 std::launch::deferred 的话， f 会被推迟执行等待 get 和 wait ，而导致 wait_for 总返回 std::feture_status::deferred
+而且这种弹性也导致问题一般都发生在系统负载高的时候，因为那种时候有更高的概率选择推迟 f 的执行
+
+所以要以默认启动策略对任务使用 std::async 需要满足以下条件：
+    任务不需要鱼调用 get 或 wait 的线程并发执行
+    读/写哪个线程的 thread_local 变量并无影响
+    或者可以给出保证在 std::async 返回的期值之上调用 get 或 wait 或者可以接受任务可以永远不被执行
+    使用 wait_for 或 wait_until 的代码会将任务被推迟纳入考量
+
+否则你很有可能想要确保任务已异步方式执行： auto fut = std::async(std::launch::async,f)
+书上还提供了一个函数，像 std::async 一样运行但会自动使用 std::launch::async 作为启动策略：
+    template<typename F, typename... Ts>
+    inline
+    std::future<typename std::result_of<F(Ts...)>::type> //auto
+    realltAsync(F&& f,Ts&&... params) {
+        return std::async(std::launch::async,
+                          std::forward<F>(f),
+                          std::forward<Ts>(params))
+    }
+一个内联的完美转发！回忆一下， std::forward 是针对万能引用，在实参为左值时不变，在实参为右值时将形参转换为右值，通过引用折叠实现
+并返回一个类型为 std:future 的对象作为使用 params 调用 f 的结果，而 std::result_of 将给你这个结果的类型
+这样一来你就可以想使用 std::async 一样使用它 auto fut = realltAsync(f);
