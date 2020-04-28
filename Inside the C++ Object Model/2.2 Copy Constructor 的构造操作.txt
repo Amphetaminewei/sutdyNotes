@@ -1,0 +1,34 @@
+2.2 Copy Constructor 的构造操作
+
+    有三种情况会以一个对象的内容初始化另一个对象：1.对一个对象做显示的复制构造；2.当对象作为参数交给某个函数；3.一个对象作为函数的返回值
+
+Default Memberwise Initialization
+    当类对象以相同类型的另一个类对象作为初值时，其内部是所谓的 Default Memberwise Initialization 手法，也就是把每一个内建的或派生的数
+    据成员的值从某个对象拷贝到另一个对象上，但他不会拷贝其中的类成员对象，而是以递归的方式实行Memberwise Initialization
+    概念上而言这个操作是由复制构造函数实现出来的，而对于没有显示实现的类而言，编译器会在比要的时候生产默认构造函数和复制构造函数
+    这个必要意指类不展现 bitwise copy semantic
+    和以前一样， C++ Standard 把复制构造函数分为有用和无用两种，只有有用的才会被合成进程序
+
+Bitwise Copy Semantic（位逐次拷贝）
+    先来说一个我之前的误区吧，以前我认为复制操作必须是依赖复制构造函数的，但是这里多了一个新的操作 bitwise copy semantic，简言之他和复制
+    构造函数功能类似，在需要复制操作但是类中没有定义复制构造函数时，如果类展现（或者说允许？） bitwise copy semantic 则编译器不会产生复制
+    构造函数加入代码
+    我对 bitwise copy semantic 的理解是编译器可以简单的进行成员的复制，而不需要调用其他类的复制构造函数，且不涉及虚函数表和虚函数指针的复制
+
+没有 Bitwise Copy Standard（我觉得这应该是翻译的问题，这一节应该说的是类不展示 bitwise copy semantic 的情况）
+    有四种情况下一个类不展示 bitwise copy semantic：
+        1.当类内含一个对象成员并且后者的类声明有一个复制构造函数的时候（不论是被显示定义还是被编译器合成）
+        2.当类继承自一个有复制构造函数的基类时（同样不论时显示定义的还是编译器合成的）
+        3.当类声明了一个或多个虚函数时
+        4.当类派生自一个继承串链，其中有一个或多个虚基类时
+
+重新设定 Virtual Table 的指针
+    如果编译器不能对每个新产生的类对象的 vptr（虚函数表指针）成功且正确的设置好初值，将导致可怕的后果，因此当编译器导入一个 vptr 到类之后，这个
+    类就不展现 bitwise semantic 了。（我的理解是 bitwise semantic 只适合可以单纯复制的内容，而 vptr 显然不是 ）这种时候就需要编译器来合成一个
+    复制构造函数了
+
+处理 Virtual Bass Class Subobject
+    每个编译器对虚继承的支持承诺都代表必须让基类对象中的 virtual bass class subobject 在执行期就准备妥当，而 bitwise copy semantic 可能会破坏
+    位置的完整性，因此编译器会在 bitwise copy 和生成复制构造函数之间进行仲裁
+    而在复制中作为右值的对象为指针时，编译器无法判断 bitwise copy semantic 是否还保持这，因为无法确定指针所指对象的类型
+    总结一下，如果复制构造函数没有被显示的定义，且类维持着 bitwise copy semantic ，则编译器不会合成复制构造函数
